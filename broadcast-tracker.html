@@ -528,6 +528,12 @@
 <div class="content" id="appContent" style="display:none">
   <div id="mhBanner"></div>
 
+  <div id="leaderboardWrap" style="display: none; padding: 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+    <h2 style="margin-bottom: 4px;">🏆 Responsiveness Leaderboard</h2>
+    <p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">Average response time across all broadcasts</p>
+    <div id="leaderboardList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+  </div>
+
   <div class="compose-wrap" id="composeWrap">
     <div class="compose-card">
       <div class="c-label">Broadcast title</div>
@@ -664,7 +670,7 @@ function enterApp() {
   if (role === 'admin') {
     chip.textContent = 'Admin';
     chip.className = 'brand-role admin';
-    document.getElementById('newBtnHeader').style.display = '';
+    document.getElementById('newBtnHeader').style.display = 'flex';
     document.getElementById('mhBanner').innerHTML = '';
   } else {
     chip.textContent = MISSIONS[myMissionIdx].name;
@@ -782,6 +788,7 @@ function renderCard(b) {
     </div>
     <div class="missions-grid">${cells}</div>
     ${role === 'admin' ? `<div class="bc-actions">
+      ${!allDone ? `<button class="btn-ghost" style="padding: 5px 10px; font-size: 11px; margin-right: 8px; color: var(--primary);" onclick="nudgePending(${b.id})">Nudge Pending</button>` : ''}
       <button class="btn-ghost" style="padding: 5px 10px; font-size: 11px; margin-right: 8px;" onclick="editBroadcast(${b.id})">Edit</button>
       <button class="btn-del" onclick="deleteBroadcast(${b.id})">Delete</button>
     </div>` : ''}
@@ -861,6 +868,71 @@ async function deleteBroadcast(id) {
   socket.emit('delete_broadcast', id);
 }
 
+function nudgePending(id) {
+  const b = broadcasts.find(x => x.id === id);
+  if (!b) return;
+  const pendingMissions = MISSIONS.filter((m, i) => !b.status[i]);
+  const names = pendingMissions.map(m => m.heads).join(', ');
+  const text = `Jai Jinendra! Just a reminder to please forward the latest broadcast: "${b.title}".\n\nPending from: ${names}`;
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank');
+}
+
+let showingLeaderboard = false;
+function toggleLeaderboard() {
+  showingLeaderboard = !showingLeaderboard;
+  if (showingLeaderboard) {
+    document.getElementById('broadcastList').style.display = 'none';
+    document.getElementById('leaderboardWrap').style.display = 'block';
+    renderLeaderboard();
+  } else {
+    document.getElementById('broadcastList').style.display = 'block';
+    document.getElementById('leaderboardWrap').style.display = 'none';
+  }
+}
+
+function renderLeaderboard() {
+  const stats = MISSIONS.map((m, i) => ({ mission: m, idx: i, times: [] }));
+  
+  broadcasts.forEach(b => {
+    Object.keys(b.status).forEach(idx => {
+      const s = b.status[idx];
+      if (s.timestamp) {
+        const diffMs = s.timestamp - b.id;
+        if (diffMs >= 0) stats[idx].times.push(diffMs);
+      }
+    });
+  });
+
+  const list = stats.map(s => {
+    if (s.times.length === 0) return { ...s, avg: Infinity, avgStr: 'No data yet' };
+    const avgMs = s.times.reduce((a,b)=>a+b,0) / s.times.length;
+    const mins = Math.round(avgMs / 60000);
+    const hrs = Math.floor(mins / 60);
+    const m = mins % 60;
+    const avgStr = hrs > 0 ? `${hrs}h ${m}m` : `${mins} mins`;
+    return { ...s, avg: avgMs, avgStr };
+  }).sort((a,b) => a.avg - b.avg);
+
+  let html = '';
+  list.forEach((item, i) => {
+    let medal = '';
+    if (i === 0 && item.avg !== Infinity) medal = '🥇 ';
+    else if (i === 1 && item.avg !== Infinity) medal = '🥈 ';
+    else if (i === 2 && item.avg !== Infinity) medal = '🥉 ';
+    
+    html += `<div style="display: flex; justify-content: space-between; padding: 12px; background: var(--bg-hover); border-radius: 8px; align-items: center;">
+      <div>
+        <div style="font-weight: 600;">${medal}${item.mission.name}</div>
+        <div style="font-size: 11px; color: var(--muted);">${item.mission.heads}</div>
+      </div>
+      <div style="font-weight: 700; color: ${item.avg === Infinity ? 'var(--muted)' : 'var(--accent)'};">${item.avgStr}</div>
+    </div>`;
+  });
+  
+  document.getElementById('leaderboardList').innerHTML = html;
+}
+
 function shakeField(id) {
   const el = document.getElementById(id);
   el.style.borderColor = 'var(--red)';
@@ -934,7 +1006,7 @@ function handleUpload(e) {
 
 async function confirmSent() {
   if (activeId === null || activeIdx === null) return;
-  const status = { time: fmtTime(), proof: uploadedImages.length > 0, images: uploadedImages };
+  const status = { time: fmtTime(), timestamp: Date.now(), proof: uploadedImages.length > 0, images: uploadedImages };
   socket.emit('confirm_sent', { id: activeId, missionIdx: activeIdx, status });
   closeSheet();
   showToast('Marked as sent ✓');
