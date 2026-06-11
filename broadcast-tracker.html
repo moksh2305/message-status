@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Beacon</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0A0C0F;
+    --surface: #13161B;
+    --surface2: #1A1E25;
+    --surface3: #21262F;
+    --border: rgba(255,255,255,0.06);
+    --border2: rgba(255,255,255,0.11);
+    --text: #EEF0F4;
+    --muted: #7A8594;
+    --hint: #404855;
+    --accent: #4F8EF7;
+    --accent-dim: rgba(79,142,247,0.13);
+    --green: #22C55E;
+    --green-dim: rgba(34,197,94,0.11);
+    --green-text: #4ADE80;
+    --green-bg: #071410;
+    --red: #EF4444;
+    --amber: #F59E0B;
+    --radius: 14px;
+    --radius-sm: 9px;
+    --radius-xs: 6px;
+    --radius-pill: 999px;
+    --font: -apple-system,'SF Pro Display',BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --sh: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  /* ── ROLE SCREEN ── */
+  .role-screen {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 32px 24px;
+    z-index: 300;
+    transition: opacity 0.3s, transform 0.3s;
+  }
+  .role-screen.hidden { opacity: 0; pointer-events: none; transform: scale(0.97); }
+
+  .role-logo {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: linear-gradient(135deg, #4F8EF7 0%, #7C3AED 100%);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+    box-shadow: 0 0 40px rgba(79,142,247,0.3);
+  }
+  .role-logo svg { width: 28px; height: 28px; fill: #fff; }
+
+  .role-screen h1 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.5px;
+    margin-bottom: 6px; text-align: center;
+  }
+  .role-screen p {
+    font-size: 14px; color: var(--muted); margin-bottom: 36px;
+    text-align: center; line-height: 1.5; max-width: 280px;
+  }
+
+  .role-choices { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 320px; }
+  .role-btn {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 18px; border-radius: var(--radius);
+    border: 1px solid var(--border2);
+    background: var(--surface); cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    text-align: left; width: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .role-btn:active { background: var(--surface2); }
+  .role-btn .role-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .role-btn.admin .role-icon { background: rgba(79,142,247,0.15); }
+  .role-btn.mission .role-icon { background: rgba(34,197,94,0.13); }
+  .role-btn .role-icon svg { width: 20px; height: 20px; }
+  .role-btn.admin .role-icon svg { fill: var(--accent); }
+  .role-btn.mission .role-icon svg { fill: var(--green-text); }
+  .role-label { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .role-desc { font-size: 12px; color: var(--muted); }
+
+  .role-sep { display: flex; align-items: center; gap: 12px; margin: 4px 0; width: 100%; max-width: 320px; }
+  .role-sep::before, .role-sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .role-sep span { font-size: 11px; color: var(--hint); }
+
+  /* mission select */
+  .mission-select-wrap { width: 100%; max-width: 320px; display: none; flex-direction: column; gap: 8px; }
+  .mission-select-wrap.show { display: flex; }
+  .mission-select-wrap .ms-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .mission-select-wrap select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: var(--radius-sm); color: var(--text); font-family: var(--font);
+    font-size: 14px; padding: 12px 14px; outline: none; appearance: none;
+    -webkit-appearance: none; cursor: pointer;
+  }
+  .btn-enter {
+    background: var(--green); color: #fff; border: none;
+    border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
+    padding: 13px; cursor: pointer; width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: opacity 0.15s;
+  }
+  .btn-enter:active { opacity: 0.8; }
+
+  /* ── HEADER ── */
+  .app-header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(10,12,15,0.88);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-bottom: 0.5px solid var(--border);
+    padding: 13px 16px 11px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .brand-dot {
+    width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+    background: linear-gradient(135deg, #4F8EF7 0%, #7C3AED 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-dot svg { width: 16px; height: 16px; fill: #fff; }
+  .brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .brand-role {
+    font-size: 10px; font-weight: 500; padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    letter-spacing: 0.3px; text-transform: uppercase;
+  }
+  .brand-role.admin { background: var(--accent-dim); color: var(--accent); }
+  .brand-role.mission { background: var(--green-dim); color: var(--green-text); }
+
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .switch-btn {
+    background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-pill); color: var(--muted);
+    font-size: 11px; padding: 6px 10px; cursor: pointer;
+    font-family: var(--font); font-weight: 500;
+    transition: background 0.15s; white-space: nowrap;
+  }
+  .switch-btn:active { background: var(--surface3); }
+  .new-btn {
+    display: flex; align-items: center; gap: 5px;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius-pill);
+    padding: 8px 13px; font-size: 13px; font-weight: 500;
+    cursor: pointer; letter-spacing: -0.1px; white-space: nowrap;
+    transition: opacity 0.15s; font-family: var(--font);
+  }
+  .new-btn:active { opacity: 0.8; }
+  .new-btn svg { width: 13px; height: 13px; fill: #fff; }
+
+  /* ── CONTENT ── */
+  .content { padding: 14px 14px 80px; max-width: 520px; margin: 0 auto; }
+
+  /* ── MISSION HEAD BANNER ── */
+  .mh-banner {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 13px 14px;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .mh-avatar {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: var(--green-dim); border: 1px solid rgba(34,197,94,0.2);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    font-size: 16px; font-weight: 700; color: var(--green-text);
+  }
+  .mh-info .mh-name { font-size: 13px; font-weight: 600; }
+  .mh-info .mh-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  /* ── COMPOSE ── */
+  .compose-wrap {
+    overflow: hidden; max-height: 0;
+    transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s;
+    opacity: 0;
+  }
+  .compose-wrap.open { max-height: 500px; opacity: 1; }
+  .compose-card {
+    background: var(--surface); border: 0.5px solid var(--border2);
+    border-radius: var(--radius); padding: 15px 14px; margin-bottom: 14px;
+  }
+  .compose-card .c-label {
+    font-size: 10px; font-weight: 600; color: var(--hint);
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 5px;
+  }
+  .compose-card input, .compose-card textarea {
+    width: 100%; background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm); color: var(--text); font-family: var(--font);
+    font-size: 14px; padding: 10px 12px; outline: none; margin-bottom: 12px;
+    transition: border-color 0.15s; -webkit-appearance: none;
+  }
+  .compose-card input:focus, .compose-card textarea:focus { border-color: var(--accent); }
+  .compose-card textarea { resize: none; height: 86px; line-height: 1.5; }
+  .compose-card input::placeholder, .compose-card textarea::placeholder { color: var(--hint); }
+  .compose-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-ghost {
+    background: none; border: 0.5px solid var(--border2); border-radius: var(--radius-sm);
+    color: var(--muted); font-size: 13px; padding: 9px 15px; cursor: pointer;
+    font-family: var(--font); transition: background 0.12s;
+  }
+  .btn-ghost:active { background: var(--surface2); }
+  .btn-publish {
+    background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 600; padding: 9px 17px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; transition: opacity 0.15s;
+    font-family: var(--font); letter-spacing: -0.1px;
+  }
+  .btn-publish:active { opacity: 0.8; }
+  .btn-publish svg { width: 13px; height: 13px; fill: #fff; }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-size: 11px; font-weight: 600; color: var(--hint);
+    text-transform: uppercase; letter-spacing: 0.8px;
+    margin-bottom: 10px; padding-left: 2px;
+  }
+
+  /* ── BROADCAST CARD ── */
+  .broadcast-card {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 12px; overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .broadcast-card.all-done {
+    border-color: rgba(34,197,94,0.22);
+    box-shadow: 0 0 0 1px rgba(34,197,94,0.06), var(--sh);
+  }
+  .broadcast-card.my-pending { border-color: rgba(245,158,11,0.3); }
+
+  .bc-head { padding: 13px 14px 0; }
+  .bc-title-row {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 8px; margin-bottom: 3px;
+  }
+  .bc-title { font-size: 14px; font-weight: 600; letter-spacing: -0.2px; line-height: 1.35; flex: 1; }
+  .bc-badges { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .bc-badge {
+    font-size: 10px; font-weight: 600; border-radius: var(--radius-pill);
+    padding: 3px 9px; white-space: nowrap; letter-spacing: 0.2px;
+  }
+  .bc-badge.pending { background: var(--surface2); color: var(--muted); }
+  .bc-badge.done { background: var(--green-dim); color: var(--green-text); }
+  .bc-badge.mine { background: rgba(245,158,11,0.12); color: #FCD34D; }
+
+  .bc-meta { font-size: 11px; color: var(--hint); margin-bottom: 10px; }
+  .bc-msg {
+    font-size: 13px; color: var(--muted); line-height: 1.6;
+    border-left: 2px solid var(--border2); padding-left: 10px; margin: 0 14px 12px;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .bc-msg.expanded { -webkit-line-clamp: unset; }
+  .bc-expand {
+    display: inline-block; font-size: 12px; color: var(--accent);
+    padding: 0 14px 10px; cursor: pointer; margin-top: -8px;
+    background: none; border: none; font-family: var(--font);
+  }
+
+  /* progress */
+  .bc-progress { padding: 0 14px 12px; }
+  .progress-track { height: 3px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+  .progress-numbers { display: flex; justify-content: space-between; margin-top: 5px; }
+  .progress-numbers span { font-size: 11px; color: var(--hint); }
+
+  /* mission grid */
+  .missions-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1px; background: var(--border);
+    border-top: 0.5px solid var(--border);
+  }
+  .mission-cell {
+    background: var(--surface); padding: 11px 12px;
+    display: flex; align-items: center; gap: 9px;
+    cursor: pointer; transition: background 0.12s;
+    user-select: none; position: relative;
+    -webkit-tap-highlight-color: transparent; min-height: 50px;
+  }
+  .mission-cell:active { background: var(--surface2); }
+  .mission-cell.confirmed { background: var(--green-bg); cursor: default; }
+  .mission-cell.confirmed:active { background: var(--green-bg); }
+  .mission-cell.is-mine { background: rgba(245,158,11,0.05); }
+  .mission-cell.is-mine:not(.confirmed):active { background: rgba(245,158,11,0.08); }
+
+  .mc-check {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 1.5px solid var(--border2); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .mission-cell.confirmed .mc-check { background: var(--green); border-color: var(--green); }
+  .mc-check svg { display: none; width: 10px; height: 10px; }
+  .mission-cell.confirmed .mc-check svg { display: block; }
+
+  .mc-info { flex: 1; min-width: 0; }
+  .mc-name {
+    font-size: 12px; font-weight: 500; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mission-cell.confirmed .mc-name { color: var(--green-text); font-weight: 600; }
+  .mission-cell.is-mine:not(.confirmed) .mc-name { color: var(--text); }
+  .mc-time { font-size: 10px; color: var(--hint); margin-top: 1px; display: none; }
+  .mission-cell.confirmed .mc-time { display: block; }
+
+  .mc-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .mc-clip { cursor: pointer; padding: 3px; }
+  .mc-clip svg { width: 12px; height: 12px; fill: var(--green-text); opacity: 0.7; display: none; }
+  .mission-cell.confirmed.has-proof .mc-clip svg { display: block; }
+
+  /* delete btn on cards */
+  .bc-actions { padding: 0 14px 12px; display: flex; justify-content: flex-end; }
+  .btn-del {
+    background: none; border: 0.5px solid rgba(239,68,68,0.2);
+    border-radius: var(--radius-xs); color: var(--red); opacity: 0.6;
+    font-size: 11px; padding: 5px 10px; cursor: pointer; font-family: var(--font);
+    transition: opacity 0.15s;
+  }
+  .btn-del:active { opacity: 1; }
+
+  /* ── BOTTOM SHEET ── */
+  .sheet-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+  }
+  .sheet-overlay.open { opacity: 1; pointer-events: all; }
+
+  .bottom-sheet {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 101;
+    background: var(--surface);
+    border-top: 0.5px solid var(--border2);
+    border-radius: 20px 20px 0 0;
+    padding: 0 16px max(20px, env(safe-area-inset-bottom));
+    transform: translateY(100%);
+    transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+    max-width: 520px; margin: 0 auto;
+    touch-action: none;
+  }
+  .bottom-sheet.open { transform: translateY(0); }
+
+  .sheet-handle {
+    width: 36px; height: 4px; background: var(--border2);
+    border-radius: 4px; margin: 10px auto 14px; cursor: grab;
+  }
+  .sheet-handle:active { cursor: grabbing; }
+  .sheet-title { font-size: 16px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 3px; }
+  .sheet-sub { font-size: 13px; color: var(--muted); margin-bottom: 18px; line-height: 1.45; }
+
+  .upload-zone {
+    border: 1.5px dashed var(--border2); border-radius: var(--radius);
+    padding: 22px 16px; text-align: center; cursor: pointer;
+    background: var(--surface2); margin-bottom: 12px;
+    transition: border-color 0.15s, background 0.15s;
+    display: block;
+  }
+  .upload-zone:active { border-color: var(--accent); background: var(--surface3); }
+  .upload-zone svg { width: 30px; height: 30px; fill: none; stroke: var(--muted); stroke-width: 1.5; margin-bottom: 9px; }
+  .upload-zone p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .upload-zone span { color: var(--accent); font-weight: 500; }
+  input[type=file] { display: none; }
+
+  .preview-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .preview-img {
+    width: 64px; height: 64px; border-radius: var(--radius-sm);
+    object-fit: cover; border: 0.5px solid var(--border2); cursor: pointer;
+  }
+
+  .sheet-btns { display: flex; gap: 8px; }
+  .btn-sheet-cancel {
+    background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm); color: var(--muted);
+    font-size: 14px; padding: 13px 16px; cursor: pointer; font-family: var(--font);
+  }
+  .btn-confirm {
+    flex: 1; background: var(--green); color: #fff; border: none;
+    border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
+    padding: 13px; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; gap: 7px; transition: opacity 0.15s;
+    font-family: var(--font); letter-spacing: -0.2px;
+  }
+  .btn-confirm:active { opacity: 0.8; }
+
+  /* ── IMAGE VIEWER ── */
+  .img-viewer-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    z-index: 200; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .img-viewer-overlay.open { opacity: 1; pointer-events: all; }
+  .img-viewer-overlay img {
+    max-width: 100%; max-height: 100%; border-radius: var(--radius-sm);
+    object-fit: contain;
+  }
+  .img-close-btn {
+    position: absolute; top: 16px; right: 16px;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.1); border: none; color: #fff;
+    font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 28px; left: 50%;
+    transform: translateX(-50%) translateY(70px);
+    background: #0D2016; color: var(--green-text);
+    border: 0.5px solid rgba(34,197,94,0.2);
+    border-radius: var(--radius-pill); padding: 10px 18px;
+    font-size: 13px; font-weight: 500; white-space: nowrap;
+    z-index: 210; transition: transform 0.32s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    opacity: 0; pointer-events: none; display: flex; align-items: center; gap: 7px;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* ── EMPTY ── */
+  .empty {
+    text-align: center; padding: 60px 16px; color: var(--hint);
+    font-size: 14px; line-height: 1.8;
+  }
+  .empty svg { width: 40px; height: 40px; fill: var(--hint); margin-bottom: 14px; opacity: 0.35; }
+  .empty strong { display: block; color: var(--muted); font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+
+  /* ── LOADING ── */
+  .loading-wrap { text-align: center; padding: 48px 16px; color: var(--hint); }
+  .spinner {
+    width: 24px; height: 24px; border: 2px solid var(--border2);
+    border-top-color: var(--accent); border-radius: 50%; margin: 0 auto 12px;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (min-width: 520px) {
+    .bottom-sheet { left: 50%; right: auto; width: 520px; transform: translateX(-50%) translateY(100%); }
+    .bottom-sheet.open { transform: translateX(-50%) translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ROLE SELECTION -->
+<div class="role-screen" id="roleScreen">
+  <div class="role-logo">
+    <svg viewBox="0 0 16 16"><path d="M8 1L2 4v4c0 3.3 2.5 6.4 6 7 3.5-.6 6-3.7 6-7V4L8 1zm-1 9.4L4.6 8 5.7 6.9l1.3 1.3 2.9-2.9 1.1 1.1L7 10.4z"/></svg>
+  </div>
+  <h1>Beacon</h1>
+  <p>Track message delivery across all mission groups — in one place.</p>
+
+  <div class="role-choices">
+    <button class="role-btn admin" onclick="chooseAdmin()">
+      <div class="role-icon">
+        <svg viewBox="0 0 20 20"><path d="M10 2a4 4 0 100 8 4 4 0 000-8zM4 14a6 6 0 0112 0v1H4v-1z"/></svg>
+      </div>
+      <div>
+        <div class="role-label">Admin</div>
+        <div class="role-desc">Create broadcasts, track all missions</div>
+      </div>
+    </button>
+
+    <div class="mission-select-wrap" id="adminPwdWrap">
+      <div class="ms-label">Admin Password</div>
+      <input type="password" id="adminPwd" placeholder="Enter password" style="width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font); font-size: 14px; padding: 12px 14px; outline: none; margin-bottom: 8px;">
+      <button class="btn-enter" onclick="verifyAdmin()">
+        Login
+      </button>
+    </div>
+
+    <div class="role-sep"><span>or</span></div>
+
+    <button class="role-btn mission" onclick="showMissionSelect()">
+      <div class="role-icon">
+        <svg viewBox="0 0 20 20"><path d="M9 12l-4-4 1.4-1.4L9 9.2l6.6-6.6L17 4l-8 8zM10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>
+      </div>
+      <div>
+        <div class="role-label">Mission Head</div>
+        <div class="role-desc">Confirm delivery for your group</div>
+      </div>
+    </button>
+
+    <div class="mission-select-wrap" id="missionSelectWrap">
+      <div class="ms-label">Select your mission</div>
+      <select id="missionSelect">
+        <option value="">— Choose mission —</option>
+      </select>
+      <button class="btn-enter" onclick="chooseMission()">
+        <svg viewBox="0 0 16 16" width="15" height="15" fill="#fff"><path d="M2 8h12M8 2l6 6-6 6" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Enter as Mission Head
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<header class="app-header" id="appHeader" style="display:none">
+  <div class="header-left">
+    <div class="brand-dot">
+      <svg viewBox="0 0 16 16"><path d="M8 1L2 4v4c0 3.3 2.5 6.4 6 7 3.5-.6 6-3.7 6-7V4L8 1zm-1 9.4L4.6 8 5.7 6.9l1.3 1.3 2.9-2.9 1.1 1.1L7 10.4z"/></svg>
+    </div>
+    <div>
+      <div class="brand-name">Beacon</div>
+    </div>
+    <div class="brand-role" id="roleChip">Admin</div>
+  </div>
+  <div class="header-right">
+    <button class="switch-btn" onclick="switchRole()">Switch</button>
+    <button class="new-btn" id="newBtnHeader" onclick="toggleCompose()" style="display:none">
+      <svg viewBox="0 0 16 16"><path d="M8 1v14M1 8h14"/></svg>
+      New
+    </button>
+  </div>
+</header>
+
+<div class="content" id="appContent" style="display:none">
+  <div id="mhBanner"></div>
+
+  <div class="compose-wrap" id="composeWrap">
+    <div class="compose-card">
+      <div class="c-label">Broadcast title</div>
+      <input type="text" id="bTitle" placeholder="e.g. Community meeting — 15 June" maxlength="80">
+      <div class="c-label">Message</div>
+      <textarea id="bMsg" placeholder="Paste the message being sent to all groups…"></textarea>
+      <div class="compose-actions">
+        <button class="btn-ghost" onclick="toggleCompose()">Cancel</button>
+        <button class="btn-publish" onclick="createBroadcast()">
+          <svg viewBox="0 0 14 14"><path d="M1 7L13 1l-3 12-3-5-3 2 1-5L1 7z"/></svg>
+          Publish
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="broadcastList"></div>
+</div>
+
+<!-- BOTTOM SHEET -->
+<div class="sheet-overlay" id="overlay" onclick="closeSheet()"></div>
+<div class="bottom-sheet" id="bottomSheet">
+  <div class="sheet-handle" id="sheetHandle"></div>
+  <div class="sheet-title" id="sheetTitle">Mark as sent</div>
+  <div class="sheet-sub" id="sheetSub">Attach a screenshot and confirm the message was forwarded.</div>
+  <label class="upload-zone" for="ssInput" id="uploadZone">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="M3 14l4-4 4 4 4-5 4 5M8 7h.01"/></svg>
+    <p>Tap to attach screenshot<br><span>Choose from photos</span></p>
+  </label>
+  <input type="file" id="ssInput" accept="image/*" multiple onchange="handleUpload(event)">
+  <div class="preview-row" id="previewRow"></div>
+  <div class="sheet-btns">
+    <button class="btn-sheet-cancel" onclick="closeSheet()">Cancel</button>
+    <button class="btn-confirm" onclick="confirmSent()">
+      <svg viewBox="0 0 16 16" width="16" height="16"><path d="M2 8l4 4 8-8" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Confirm sent
+    </button>
+  </div>
+</div>
+
+<!-- IMAGE VIEWER -->
+<div class="img-viewer-overlay" id="imgViewer" onclick="closeImgViewer()">
+  <button class="img-close-btn">✕</button>
+  <img id="imgViewerSrc" src="" alt="Screenshot proof">
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 14 14" width="14" height="14"><path d="M2 7l3 3 7-7" stroke="#4ADE80" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <span id="toastMsg">Marked as sent</span>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const MISSIONS = ["Youth Mission","Prayer Team","Outreach","Media & Comms","Worship","Finance","Education","Welfare"];
+
+// ── STATE ──
+let role = null;        // 'admin' | 'mission'
+let myMissionIdx = null;
+let broadcasts = [];
+let activeId = null, activeIdx = null;
+let uploadedImages = [];
+
+// ── SOCKET ──
+socket.on('init_data', (data) => {
+  broadcasts = data;
+  if (role) renderAll();
+});
+
+socket.on('state_update', (data) => {
+  broadcasts = data;
+  if (role) renderAll();
+});
+
+// ── ROLE SELECTION ──
+function chooseAdmin() {
+  document.getElementById('missionSelectWrap').classList.remove('show');
+  document.getElementById('adminPwdWrap').classList.add('show');
+  document.getElementById('adminPwd').focus();
+}
+
+function verifyAdmin() {
+  const pwd = document.getElementById('adminPwd').value;
+  if (pwd === "Parasdham2026") {
+    role = 'admin'; myMissionIdx = null;
+    document.getElementById('adminPwd').value = '';
+    enterApp();
+  } else {
+    shakeField('adminPwd');
+  }
+}
+
+function showMissionSelect() {
+  document.getElementById('adminPwdWrap').classList.remove('show');
+  const w = document.getElementById('missionSelectWrap');
+  w.classList.add('show');
+  const sel = document.getElementById('missionSelect');
+  if (!sel.children.length || sel.children[0].value === '') {
+    sel.innerHTML = '<option value="">— Choose mission —</option>' +
+      MISSIONS.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+  }
+}
+
+function chooseMission() {
+  const idx = document.getElementById('missionSelect').value;
+  if (idx === '') return;
+  role = 'mission'; myMissionIdx = parseInt(idx);
+  enterApp();
+}
+
+function enterApp() {
+  document.getElementById('roleScreen').classList.add('hidden');
+  setTimeout(() => document.getElementById('roleScreen').style.display = 'none', 300);
+  document.getElementById('appHeader').style.display = '';
+  document.getElementById('appContent').style.display = '';
+
+  // role chip
+  const chip = document.getElementById('roleChip');
+  if (role === 'admin') {
+    chip.textContent = 'Admin';
+    chip.className = 'brand-role admin';
+    document.getElementById('newBtnHeader').style.display = '';
+    document.getElementById('mhBanner').innerHTML = '';
+  } else {
+    chip.textContent = MISSIONS[myMissionIdx];
+    chip.className = 'brand-role mission';
+    document.getElementById('newBtnHeader').style.display = 'none';
+    document.getElementById('mhBanner').innerHTML = `
+      <div class="mh-banner">
+        <div class="mh-avatar">${MISSIONS[myMissionIdx][0]}</div>
+        <div class="mh-info">
+          <div class="mh-name">${MISSIONS[myMissionIdx]}</div>
+          <div class="mh-sub">Tap your mission's cell to confirm a broadcast was forwarded</div>
+        </div>
+      </div>`;
+  }
+
+  loadAndRender();
+}
+
+function switchRole() {
+  role = null; myMissionIdx = null;
+  document.getElementById('appHeader').style.display = 'none';
+  document.getElementById('appContent').style.display = 'none';
+  document.getElementById('missionSelectWrap').classList.remove('show');
+  document.getElementById('adminPwdWrap').classList.remove('show');
+  document.getElementById('missionSelect').value = '';
+  document.getElementById('adminPwd').value = '';
+  const rs = document.getElementById('roleScreen');
+  rs.style.display = '';
+  rs.classList.remove('hidden');
+}
+
+// ── RENDER ──
+function loadAndRender() {
+  renderAll();
+}
+
+function renderAll() {
+  const list = document.getElementById('broadcastList');
+  if (!broadcasts.length) {
+    list.innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24"><path d="M4 4h16v12H4V4zm0 12l4-4 4 4 4-5 4 5M3 20h18"/></svg>
+      <strong>No broadcasts yet</strong>
+      ${role === 'admin' ? 'Tap <b>New</b> to create the first broadcast.' : 'No broadcasts from admin yet.'}
+    </div>`;
+    return;
+  }
+
+  const sorted = [...broadcasts].sort((a, b) => b.id - a.id);
+  let html = '';
+  if (role === 'mission') {
+    const pending = sorted.filter(b => !b.status[myMissionIdx]);
+    const done = sorted.filter(b => b.status[myMissionIdx]);
+    if (pending.length) {
+      html += `<div class="section-label">Needs your confirmation (${pending.length})</div>`;
+      html += pending.map(b => renderCard(b)).join('');
+    }
+    if (done.length) {
+      html += `<div class="section-label" style="margin-top:${pending.length ? 18 : 0}px">Confirmed by you (${done.length})</div>`;
+      html += done.map(b => renderCard(b)).join('');
+    }
+  } else {
+    html = sorted.map(b => renderCard(b)).join('');
+  }
+  list.innerHTML = html;
+}
+
+function renderCard(b) {
+  const done = Object.keys(b.status).length;
+  const total = MISSIONS.length;
+  const pct = Math.round((done / total) * 100);
+  const allDone = done === total;
+  const isMineConfirmed = role === 'mission' && b.status[myMissionIdx];
+  const isMineCard = role === 'mission' && !isMineConfirmed;
+
+  const cells = MISSIONS.map((m, i) => {
+    const s = b.status[i];
+    const isMe = role === 'mission' && i === myMissionIdx;
+    const clickable = !s && (role === 'admin' || isMe);
+    return `<div class="mission-cell${s ? ' confirmed' : ''}${s && s.proof ? ' has-proof' : ''}${isMe ? ' is-mine' : ''}"
+      ${clickable ? `onclick="openSheet(${b.id},${i})"` : ''}>
+      <div class="mc-check">
+        <svg viewBox="0 0 10 10" style="fill:none;stroke:#fff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round">
+          <path d="M1.5 5l2.5 2.5 4.5-4.5"/>
+        </svg>
+      </div>
+      <div class="mc-info">
+        <div class="mc-name">${m}</div>
+        <div class="mc-time">${s ? s.time : ''}</div>
+      </div>
+      <div class="mc-right">
+        ${s && s.proof ? `<div class="mc-clip" onclick="event.stopPropagation();viewProof('${b.id}',${i})"><svg viewBox="0 0 12 12"><path d="M10 4.5L5.3 9.2a2.6 2.6 0 01-3.7-3.7l4.8-4.8a1.7 1.7 0 012.4 2.4L4 7.9a.9.9 0 01-1.2-1.2l4.4-4.4" stroke="currentColor" fill="none" stroke-width="1.2" stroke-linecap="round"/></svg></div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const msgId = `msg-${b.id}`;
+  return `<div class="broadcast-card${allDone ? ' all-done' : ''}${isMineCard ? ' my-pending' : ''}" id="bc-${b.id}">
+    <div class="bc-head">
+      <div class="bc-title-row">
+        <div class="bc-title">${escHtml(b.title)}</div>
+        <div class="bc-badges">
+          ${role === 'mission' && !isMineConfirmed && !allDone ? '<span class="bc-badge mine">Awaiting you</span>' : ''}
+          <span class="bc-badge ${allDone ? 'done' : 'pending'}">${allDone ? '✓ All sent' : `${done}/${total}`}</span>
+        </div>
+      </div>
+      <div class="bc-meta">${b.time}</div>
+    </div>
+    <div class="bc-msg" id="${msgId}">${escHtml(b.msg)}</div>
+    <button class="bc-expand" onclick="toggleMsg('${msgId}',this)" id="exp-${b.id}">Show more</button>
+    <div class="bc-progress">
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-numbers"><span>${done} of ${total} confirmed</span><span>${pct}%</span></div>
+    </div>
+    <div class="missions-grid">${cells}</div>
+    ${role === 'admin' ? `<div class="bc-actions"><button class="btn-del" onclick="deleteBroadcast(${b.id})">Delete</button></div>` : ''}
+  </div>`;
+}
+
+function toggleMsg(id, btn) {
+  const el = document.getElementById(id);
+  const exp = el.classList.toggle('expanded');
+  btn.textContent = exp ? 'Show less' : 'Show more';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+// ── COMPOSE ──
+function toggleCompose() {
+  const w = document.getElementById('composeWrap');
+  w.classList.toggle('open');
+  if (w.classList.contains('open')) setTimeout(() => document.getElementById('bTitle').focus(), 350);
+}
+
+async function createBroadcast() {
+  const t = document.getElementById('bTitle').value.trim();
+  const m = document.getElementById('bMsg').value.trim();
+  if (!t) { shakeField('bTitle'); return; }
+  if (!m) { shakeField('bMsg'); return; }
+  const b = { id: Date.now(), title: t, msg: m, time: fmtTime(), status: {} };
+  socket.emit('new_broadcast', b);
+  document.getElementById('bTitle').value = '';
+  document.getElementById('bMsg').value = '';
+  document.getElementById('composeWrap').classList.remove('open');
+  showToast('Broadcast published');
+}
+
+async function deleteBroadcast(id) {
+  if (!confirm('Delete this broadcast?')) return;
+  socket.emit('delete_broadcast', id);
+}
+
+function shakeField(id) {
+  const el = document.getElementById(id);
+  el.style.borderColor = 'var(--red)';
+  el.focus();
+  el.style.animation = 'none';
+  setTimeout(() => el.style.borderColor = '', 1800);
+}
+
+// ── SHEET ──
+function openSheet(id, idx) {
+  const b = broadcasts.find(x => x.id === id);
+  if (!b || b.status[idx]) return;
+  if (role === 'mission' && idx !== myMissionIdx) return;
+  activeId = id; activeIdx = idx; uploadedImages = [];
+  document.getElementById('previewRow').innerHTML = '';
+  document.getElementById('ssInput').value = '';
+  document.getElementById('sheetTitle').textContent = `${MISSIONS[idx]} — mark as sent`;
+  document.getElementById('sheetSub').textContent = `Confirm the message was forwarded to the ${MISSIONS[idx]} group. Attach a screenshot as proof (optional).`;
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('bottomSheet').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setupSheetSwipe();
+}
+
+function closeSheet() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('bottomSheet').classList.remove('open');
+  document.body.style.overflow = '';
+  activeId = null; activeIdx = null;
+}
+
+function handleUpload(e) {
+  const prev = document.getElementById('previewRow');
+  Array.from(e.target.files).forEach(f => {
+    if (!f.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const imgObj = new Image();
+      imgObj.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = imgObj.width;
+        let height = imgObj.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+        } else {
+          if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(imgObj, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        uploadedImages.push(dataUrl);
+        
+        const img = document.createElement('img');
+        img.className = 'preview-img';
+        img.src = dataUrl;
+        img.onclick = () => openImgViewer(dataUrl);
+        prev.appendChild(img);
+      };
+      imgObj.src = ev.target.result;
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
+async function confirmSent() {
+  if (activeId === null || activeIdx === null) return;
+  const status = { time: fmtTime(), proof: uploadedImages.length > 0, images: uploadedImages };
+  socket.emit('confirm_sent', { id: activeId, missionIdx: activeIdx, status });
+  closeSheet();
+  showToast('Marked as sent ✓');
+}
+
+// ── PROOF VIEWER ──
+function viewProof(broadcastId, missionIdx) {
+  const b = broadcasts.find(x => x.id == broadcastId);
+  if (!b || !b.status[missionIdx] || !b.status[missionIdx].images?.length) return;
+  openImgViewer(b.status[missionIdx].images[0]);
+}
+
+function openImgViewer(src) {
+  document.getElementById('imgViewerSrc').src = src;
+  document.getElementById('imgViewer').classList.add('open');
+}
+function closeImgViewer() {
+  document.getElementById('imgViewer').classList.remove('open');
+  document.getElementById('imgViewerSrc').src = '';
+}
+
+// ── SWIPE TO DISMISS SHEET ──
+function setupSheetSwipe() {
+  const sheet = document.getElementById('bottomSheet');
+  const handle = document.getElementById('sheetHandle');
+  let startY = 0, currentY = 0, dragging = false;
+
+  const onStart = e => {
+    startY = e.touches ? e.touches[0].clientY : e.clientY;
+    dragging = true;
+    sheet.style.transition = 'none';
+  };
+  const onMove = e => {
+    if (!dragging) return;
+    currentY = (e.touches ? e.touches[0].clientY : e.clientY) - startY;
+    if (currentY < 0) currentY = 0;
+    sheet.style.transform = `translateY(${currentY}px)`;
+  };
+  const onEnd = () => {
+    if (!dragging) return;
+    dragging = false;
+    sheet.style.transition = '';
+    if (currentY > 100) { closeSheet(); }
+    else { sheet.style.transform = ''; }
+    currentY = 0;
+  };
+
+  handle.addEventListener('touchstart', onStart, { passive: true });
+  handle.addEventListener('touchmove', onMove, { passive: true });
+  handle.addEventListener('touchend', onEnd);
+}
+
+// ── HELPERS ──
+function fmtTime() {
+  return new Date().toLocaleString('en-IN', {
+    hour: '2-digit', minute: '2-digit', hour12: true,
+    day: '2-digit', month: 'short'
+  });
+}
+
+function showToast(msg = 'Done') {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ── INIT ──
+// Pre-populate mission select
+const sel = document.getElementById('missionSelect');
+sel.innerHTML = '<option value="">— Choose mission —</option>' +
+  MISSIONS.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+</script>
+</body>
+</html>
