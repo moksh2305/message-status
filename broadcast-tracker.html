@@ -781,7 +781,10 @@ function renderCard(b) {
       <div class="progress-numbers"><span>${done} of ${total} confirmed</span><span>${pct}%</span></div>
     </div>
     <div class="missions-grid">${cells}</div>
-    ${role === 'admin' ? `<div class="bc-actions"><button class="btn-del" onclick="deleteBroadcast(${b.id})">Delete</button></div>` : ''}
+    ${role === 'admin' ? `<div class="bc-actions">
+      <button class="btn-ghost" style="padding: 5px 10px; font-size: 11px; margin-right: 8px;" onclick="editBroadcast(${b.id})">Edit</button>
+      <button class="btn-del" onclick="deleteBroadcast(${b.id})">Delete</button>
+    </div>` : ''}
   </div>`;
 }
 
@@ -796,10 +799,44 @@ function escHtml(s) {
 }
 
 // ── COMPOSE ──
+let editingId = null;
+
+function resetCompose() {
+  editingId = null;
+  document.getElementById('bTitle').value = '';
+  document.getElementById('bMsg').value = '';
+  document.getElementById('composeWrap').classList.remove('open');
+  const btn = document.querySelector('.btn-publish');
+  if(btn) {
+    btn.innerHTML = `<svg viewBox="0 0 14 14"><path d="M1 7L13 1l-3 12-3-5-3 2 1-5L1 7z"/></svg> Publish`;
+  }
+}
+
 function toggleCompose() {
   const w = document.getElementById('composeWrap');
-  w.classList.toggle('open');
-  if (w.classList.contains('open')) setTimeout(() => document.getElementById('bTitle').focus(), 350);
+  if (w.classList.contains('open')) {
+    resetCompose();
+  } else {
+    resetCompose();
+    w.classList.add('open');
+    setTimeout(() => document.getElementById('bTitle').focus(), 350);
+  }
+}
+
+function editBroadcast(id) {
+  const b = broadcasts.find(x => x.id === id);
+  if (!b) return;
+  editingId = id;
+  document.getElementById('bTitle').value = b.title;
+  document.getElementById('bMsg').value = b.msg;
+  document.getElementById('composeWrap').classList.add('open');
+  document.getElementById('bTitle').focus();
+  
+  const btn = document.querySelector('.btn-publish');
+  if(btn) {
+    btn.innerHTML = `<svg viewBox="0 0 14 14"><path d="M1 7L13 1l-3 12-3-5-3 2 1-5L1 7z"/></svg> Update`;
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function createBroadcast() {
@@ -807,12 +844,16 @@ async function createBroadcast() {
   const m = document.getElementById('bMsg').value.trim();
   if (!t) { shakeField('bTitle'); return; }
   if (!m) { shakeField('bMsg'); return; }
-  const b = { id: Date.now(), title: t, msg: m, time: fmtTime(), status: {} };
-  socket.emit('new_broadcast', b);
-  document.getElementById('bTitle').value = '';
-  document.getElementById('bMsg').value = '';
-  document.getElementById('composeWrap').classList.remove('open');
-  showToast('Broadcast published');
+  
+  if (editingId) {
+    socket.emit('edit_broadcast', { id: editingId, title: t, msg: m });
+    showToast('Broadcast updated');
+  } else {
+    const b = { id: Date.now(), title: t, msg: m, time: fmtTime(), status: {} };
+    socket.emit('new_broadcast', b);
+    showToast('Broadcast published');
+  }
+  resetCompose();
 }
 
 async function deleteBroadcast(id) {

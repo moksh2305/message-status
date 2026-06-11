@@ -74,6 +74,17 @@ io.on('connection', (socket) => {
     io.emit('state_update', broadcasts);
   });
 
+  // Listen for edit broadcast
+  socket.on('edit_broadcast', ({ id, title, msg }) => {
+    const b = broadcasts.find(x => x.id === id);
+    if (b) {
+      b.title = title;
+      b.msg = msg;
+      saveData();
+      io.emit('state_update', broadcasts);
+    }
+  });
+
   // Listen for confirm sent
   socket.on('confirm_sent', ({ id, missionIdx, status }) => {
     const b = broadcasts.find(x => x.id === id);
