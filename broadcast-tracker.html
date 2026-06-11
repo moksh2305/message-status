@@ -582,7 +582,22 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-const MISSIONS = ["Youth Mission","Prayer Team","Outreach","Media & Comms","Worship","Finance","Education","Welfare"];
+const MISSIONS = [
+  { name: "LnL - parent todder", heads: "Dhruvi didi" },
+  { name: "Look n learn", heads: "Reshma didi" },
+  { name: "AYSG gen nxt", heads: "Moksh bhai, Dheer bhai" },
+  { name: "AYSG Sr", heads: "Jatin bhai" },
+  { name: "SDM & Jatna", heads: "Shweta didi" },
+  { name: "SMM Jr.", heads: "Heena didi" },
+  { name: "SMM sr.", heads: "Neeta didi" },
+  { name: "SSG", heads: "Sanjay bhai" },
+  { name: "Aagan Vachan", heads: "Chetna didi" },
+  { name: "Divine Drive", heads: "Priti didi, Durga didi" },
+  { name: "Arham sr.citizen", heads: "Manoj bhai" },
+  { name: "Guru Aagna Satsang", heads: "Reshma didi, Darshit bhai" },
+  { name: "Comitee members", heads: "Sagar bhai, Jayesh bhai" },
+  { name: "Gurubhakti Parivar", heads: "Reshma didi, Darshana Mehta didi" }
+];
 
 // ── STATE ──
 let role = null;        // 'admin' | 'mission'
@@ -627,7 +642,7 @@ function showMissionSelect() {
   const sel = document.getElementById('missionSelect');
   if (!sel.children.length || sel.children[0].value === '') {
     sel.innerHTML = '<option value="">— Choose mission —</option>' +
-      MISSIONS.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+      MISSIONS.map((m, i) => `<option value="${i}">${m.name} (${m.heads})</option>`).join('');
   }
 }
 
@@ -652,14 +667,15 @@ function enterApp() {
     document.getElementById('newBtnHeader').style.display = '';
     document.getElementById('mhBanner').innerHTML = '';
   } else {
-    chip.textContent = MISSIONS[myMissionIdx];
+    chip.textContent = MISSIONS[myMissionIdx].name;
     chip.className = 'brand-role mission';
     document.getElementById('newBtnHeader').style.display = 'none';
     document.getElementById('mhBanner').innerHTML = `
       <div class="mh-banner">
-        <div class="mh-avatar">${MISSIONS[myMissionIdx][0]}</div>
+        <div class="mh-avatar">${MISSIONS[myMissionIdx].name[0]}</div>
         <div class="mh-info">
-          <div class="mh-name">${MISSIONS[myMissionIdx]}</div>
+          <div class="mh-name">${MISSIONS[myMissionIdx].name}</div>
+          <div class="mh-sub" style="color: var(--accent); margin-bottom: 2px;">${MISSIONS[myMissionIdx].heads}</div>
           <div class="mh-sub">Tap your mission's cell to confirm a broadcast was forwarded</div>
         </div>
       </div>`;
@@ -736,7 +752,8 @@ function renderCard(b) {
         </svg>
       </div>
       <div class="mc-info">
-        <div class="mc-name">${m}</div>
+        <div class="mc-name">${m.name}</div>
+        <div class="mc-time" style="display:block; color:var(--muted); font-size: 10px;">${m.heads}</div>
         <div class="mc-time">${s ? s.time : ''}</div>
       </div>
       <div class="mc-right">
@@ -819,8 +836,8 @@ function openSheet(id, idx) {
   activeId = id; activeIdx = idx; uploadedImages = [];
   document.getElementById('previewRow').innerHTML = '';
   document.getElementById('ssInput').value = '';
-  document.getElementById('sheetTitle').textContent = `${MISSIONS[idx]} — mark as sent`;
-  document.getElementById('sheetSub').textContent = `Confirm the message was forwarded to the ${MISSIONS[idx]} group. Attach a screenshot as proof (optional).`;
+  document.getElementById('sheetTitle').textContent = `${MISSIONS[idx].name} — mark as sent`;
+  document.getElementById('sheetSub').textContent = `Confirm the message was forwarded to the ${MISSIONS[idx].name} group. Attach a screenshot as proof (optional).`;
   document.getElementById('overlay').classList.add('open');
   document.getElementById('bottomSheet').classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -948,7 +965,7 @@ function showToast(msg = 'Done') {
 // Pre-populate mission select
 const sel = document.getElementById('missionSelect');
 sel.innerHTML = '<option value="">— Choose mission —</option>' +
-  MISSIONS.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+  MISSIONS.map((m, i) => `<option value="${i}">${m.name} (${m.heads})</option>`).join('');
 </script>
 </body>
 </html>
