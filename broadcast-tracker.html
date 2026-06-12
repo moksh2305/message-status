@@ -941,7 +941,7 @@ function nudgePending(id) {
   const b = broadcasts.find(x => x.id === id);
   if (!b) return;
   const pendingMissions = MISSIONS.filter((m, i) => !b.status[i]);
-  const names = pendingMissions.map(m => m.heads).join(', ');
+  const names = pendingMissions.map(m => m.name).join(', ');
   const text = `Jai Jinendra! Just a reminder to please forward the latest broadcast: "${b.title}".\n\nPending from: ${names}`;
   const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
   window.open(url, '_blank');
