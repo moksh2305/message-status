@@ -536,10 +536,21 @@
 
   <div class="compose-wrap" id="composeWrap">
     <div class="compose-card">
-      <div class="c-label">Broadcast title</div>
-      <input type="text" id="bTitle" placeholder="e.g. Community meeting — 15 June" maxlength="80">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div class="c-label" style="margin-bottom: 0;">Broadcast title</div>
+        <select id="tplSelect" style="font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--fg);" onchange="applyTemplate()">
+          <option value="">Use template...</option>
+          <option value="weekly">Weekly Update</option>
+          <option value="meeting">Meeting Invite</option>
+          <option value="urgent">Urgent Announcement</option>
+        </select>
+      </div>
+      <input type="text" id="bTitle" placeholder="e.g. Community meeting — 15 June" maxlength="80" oninput="saveDraft()">
       <div class="c-label">Message</div>
-      <textarea id="bMsg" placeholder="Paste the message being sent to all groups…"></textarea>
+      <textarea id="bMsg" placeholder="Paste the message being sent to all groups…" oninput="saveDraft()"></textarea>
+      
+      <div class="c-label" style="margin-top: 8px;">Schedule for later (Optional)</div>
+      <input type="datetime-local" id="bSchedule" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; background: var(--bg); color: var(--fg); font-family: inherit;">
       <div class="compose-actions">
         <button class="btn-ghost" onclick="toggleCompose()">Cancel</button>
         <button class="btn-publish" onclick="createBroadcast()">
@@ -719,7 +730,19 @@ function renderAll() {
     return;
   }
 
-  const sorted = [...broadcasts].sort((a, b) => b.id - a.id);
+  const now = Date.now();
+  let visibleBroadcasts = broadcasts;
+  
+  if (role === 'mission') {
+    visibleBroadcasts = broadcasts.filter(b => !b.scheduledFor || b.scheduledFor <= now);
+  }
+
+  if (!visibleBroadcasts.length) {
+    list.innerHTML = `<div class="empty"><strong>No live broadcasts</strong><br>Check back later.</div>`;
+    return;
+  }
+
+  const sorted = [...visibleBroadcasts].sort((a, b) => b.id - a.id);
   let html = '';
   if (role === 'mission') {
     const pending = sorted.filter(b => !b.status[myMissionIdx]);
@@ -774,6 +797,7 @@ function renderCard(b) {
       <div class="bc-title-row">
         <div class="bc-title">${escHtml(b.title)}</div>
         <div class="bc-badges">
+          ${b.scheduledFor && b.scheduledFor > Date.now() ? `<span class="bc-badge" style="background: var(--primary); color: white;">Scheduled for ${new Date(b.scheduledFor).toLocaleString('en-IN', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})}</span>` : ''}
           ${role === 'mission' && !isMineConfirmed && !allDone ? '<span class="bc-badge mine">Awaiting you</span>' : ''}
           <span class="bc-badge ${allDone ? 'done' : 'pending'}">${allDone ? '✓ All sent' : `${done}/${total}`}</span>
         </div>
@@ -808,10 +832,45 @@ function escHtml(s) {
 // ── COMPOSE ──
 let editingId = null;
 
+const TEMPLATES = {
+  weekly: { title: "Weekly Update", msg: "Jai Jinendra!\n\nPlease find the weekly updates attached. Kindly forward this to all group members and confirm below.\n\nThank you." },
+  meeting: { title: "Meeting Invite", msg: "Jai Jinendra!\n\nWe have an upcoming committee meeting. Please share this invite with your respective groups and remind them to attend on time." },
+  urgent: { title: "Urgent Announcement", msg: "Jai Jinendra!\n\nURGENT: Please forward this important update to all members immediately." }
+};
+
+function applyTemplate() {
+  const val = document.getElementById('tplSelect').value;
+  if (val && TEMPLATES[val]) {
+    document.getElementById('bTitle').value = TEMPLATES[val].title;
+    document.getElementById('bMsg').value = TEMPLATES[val].msg;
+    saveDraft();
+  }
+}
+
+function saveDraft() {
+  if (editingId) return;
+  const t = document.getElementById('bTitle').value;
+  const m = document.getElementById('bMsg').value;
+  localStorage.setItem('psdm_draft', JSON.stringify({ t, m }));
+}
+
+function loadDraft() {
+  const draft = localStorage.getItem('psdm_draft');
+  if (draft) {
+    try {
+      const { t, m } = JSON.parse(draft);
+      document.getElementById('bTitle').value = t || '';
+      document.getElementById('bMsg').value = m || '';
+    } catch (e) {}
+  }
+}
+
 function resetCompose() {
   editingId = null;
   document.getElementById('bTitle').value = '';
   document.getElementById('bMsg').value = '';
+  document.getElementById('bSchedule').value = '';
+  document.getElementById('tplSelect').value = '';
   document.getElementById('composeWrap').classList.remove('open');
   const btn = document.querySelector('.btn-publish');
   if(btn) {
@@ -825,6 +884,7 @@ function toggleCompose() {
     resetCompose();
   } else {
     resetCompose();
+    loadDraft();
     w.classList.add('open');
     setTimeout(() => document.getElementById('bTitle').focus(), 350);
   }
@@ -836,6 +896,11 @@ function editBroadcast(id) {
   editingId = id;
   document.getElementById('bTitle').value = b.title;
   document.getElementById('bMsg').value = b.msg;
+  if (b.scheduledFor) {
+    const d = new Date(b.scheduledFor);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    document.getElementById('bSchedule').value = d.toISOString().slice(0,16);
+  }
   document.getElementById('composeWrap').classList.add('open');
   document.getElementById('bTitle').focus();
   
@@ -849,16 +914,20 @@ function editBroadcast(id) {
 async function createBroadcast() {
   const t = document.getElementById('bTitle').value.trim();
   const m = document.getElementById('bMsg').value.trim();
+  const sched = document.getElementById('bSchedule').value;
   if (!t) { shakeField('bTitle'); return; }
   if (!m) { shakeField('bMsg'); return; }
   
+  const schedTime = sched ? new Date(sched).getTime() : null;
+  
   if (editingId) {
-    socket.emit('edit_broadcast', { id: editingId, title: t, msg: m });
+    socket.emit('edit_broadcast', { id: editingId, title: t, msg: m, scheduledFor: schedTime });
     showToast('Broadcast updated');
   } else {
-    const b = { id: Date.now(), title: t, msg: m, time: fmtTime(), status: {} };
+    const b = { id: Date.now(), title: t, msg: m, time: fmtTime(), status: {}, scheduledFor: schedTime };
     socket.emit('new_broadcast', b);
-    showToast('Broadcast published');
+    showToast(schedTime ? 'Broadcast scheduled' : 'Broadcast published');
+    localStorage.removeItem('psdm_draft');
   }
   resetCompose();
 }
@@ -914,7 +983,10 @@ function renderLeaderboard() {
     return { ...s, avg: avgMs, avgStr };
   }).sort((a,b) => a.avg - b.avg);
 
-  let html = '';
+  let html = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+    <h3 style="font-size: 14px; color: var(--fg);">Missions Overview</h3>
+    <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; border: 1px solid var(--border);" onclick="exportCSV()">Export to CSV</button>
+  </div>`;
   list.forEach((item, i) => {
     let medal = '';
     if (i === 0 && item.avg !== Infinity) medal = '🥇 ';
@@ -931,6 +1003,43 @@ function renderLeaderboard() {
   });
   
   document.getElementById('leaderboardList').innerHTML = html;
+}
+
+function exportCSV() {
+  const rows = [
+    ['Broadcast ID', 'Title', 'Creation Time', 'Scheduled Time', 'Mission Name', 'Status', 'Confirmation Time', 'Time Taken (Mins)']
+  ];
+
+  broadcasts.forEach(b => {
+    MISSIONS.forEach((m, i) => {
+      const s = b.status[i];
+      const statusText = s ? 'Confirmed' : 'Pending';
+      const confTime = s && s.time ? s.time : '';
+      let timeTaken = '';
+      if (s && s.timestamp) {
+        timeTaken = Math.round((s.timestamp - b.id) / 60000);
+      }
+      
+      rows.push([
+        b.id,
+        `"${b.title.replace(/"/g, '""')}"`,
+        `"${b.time}"`,
+        b.scheduledFor ? `"${new Date(b.scheduledFor).toLocaleString()}"` : 'N/A',
+        `"${m.name}"`,
+        statusText,
+        `"${confTime}"`,
+        timeTaken
+      ]);
+    });
+  });
+
+  const csv = rows.map(e => e.join(",")).join("\n");
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `Parasdham_Report_${new Date().toISOString().split('T')[0]}.csv`);
+  link.click();
 }
 
 function shakeField(id) {
@@ -1079,6 +1188,10 @@ function showToast(msg = 'Done') {
 const sel = document.getElementById('missionSelect');
 sel.innerHTML = '<option value="">— Choose mission —</option>' +
   MISSIONS.map((m, i) => `<option value="${i}">${m.name} (${m.heads})</option>`).join('');
+
+setInterval(() => {
+  if (role) renderAll();
+}, 60000);
 </script>
 </body>
 </html>

@@ -75,11 +75,12 @@ io.on('connection', (socket) => {
   });
 
   // Listen for edit broadcast
-  socket.on('edit_broadcast', ({ id, title, msg }) => {
+  socket.on('edit_broadcast', ({ id, title, msg, scheduledFor }) => {
     const b = broadcasts.find(x => x.id === id);
     if (b) {
       b.title = title;
       b.msg = msg;
+      if (scheduledFor !== undefined) b.scheduledFor = scheduledFor;
       saveData();
       io.emit('state_update', broadcasts);
     }
