@@ -517,6 +517,7 @@
     <div class="brand-role" id="roleChip">Admin</div>
   </div>
   <div class="header-right">
+    <button class="btn-ghost" id="btnLeaderboard" onclick="toggleLeaderboard()" style="display:none; padding: 6px 12px; margin-right: 8px; border: 1px solid var(--border);">Leaderboard</button>
     <button class="switch-btn" onclick="switchRole()">Switch</button>
     <button class="new-btn" id="newBtnHeader" onclick="toggleCompose()" style="display:none">
       <svg viewBox="0 0 16 16"><path d="M8 1v14M1 8h14"/></svg>
@@ -682,11 +683,13 @@ function enterApp() {
     chip.textContent = 'Admin';
     chip.className = 'brand-role admin';
     document.getElementById('newBtnHeader').style.display = 'flex';
+    document.getElementById('btnLeaderboard').style.display = 'inline-block';
     document.getElementById('mhBanner').innerHTML = '';
   } else {
     chip.textContent = MISSIONS[myMissionIdx].name;
     chip.className = 'brand-role mission';
     document.getElementById('newBtnHeader').style.display = 'none';
+    document.getElementById('btnLeaderboard').style.display = 'none';
     document.getElementById('mhBanner').innerHTML = `
       <div class="mh-banner">
         <div class="mh-avatar">${MISSIONS[myMissionIdx].name[0]}</div>
